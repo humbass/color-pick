@@ -4,8 +4,9 @@
       <div class="shower">
         <canvas class="canvas" ref="canvasRef" @click="getColor" :style="canvasStyle"></canvas>
       </div>
-      <button class="select" @click="callImage">
-        选择一个本地图片<input ref="fileRef" type="file" accept="image/*" @change="selectImage" />
+      <button class="select" @click="callImage" ref="dropRef">
+        <span>{{ content }}</span> <span v-if="isTip" class="tip">选择的图片太小了</span>
+        <input ref="fileRef" type="file" accept="image/*" @change="selectImage" />
       </button>
     </div>
     <div class="right">
@@ -31,11 +32,15 @@
 </template>
 
 <script>
-import { ref, reactive, watch, computed, onBeforeMount } from 'vue'
+const Content = ['选择一个本地图片 ( 或将图片拖拽到这里 )', '放开自动上传']
+import { ref, reactive, watch, computed, onBeforeMount, onMounted } from 'vue'
 
 export default {
   setup() {
     let ctx = null
+    const content = ref(Content[0])
+    const isTip = ref(false)
+    const dropRef = ref(null)
     const canvasRef = ref(null)
     const fileRef = ref(null)
     const sourceRef = ref(null)
@@ -74,6 +79,10 @@ export default {
       image.onload = () => {
         const canvas = canvasRef.value
         let { width, height } = image
+        if (width < 500 || height < 500) {
+          return (isTip.value = true)
+        }
+        isTip.value = false
         if (width > height) {
           let rate = height / width
           width = 500
@@ -153,8 +162,7 @@ export default {
       average.hex = '#' + rHex + gHex + bHex
     })
 
-    const selectImage = event => {
-      const file = event.target.files[0]
+    const readFile = file => {
       const reader = new FileReader()
       reader.readAsDataURL(file)
       reader.onload = img => {
@@ -162,9 +170,47 @@ export default {
         clearColorList()
       }
     }
+
+    const selectImage = event => {
+      let file = event.target.files[0]
+      readFile(file)
+    }
     const callImage = () => {
       fileRef.value.click()
     }
+    const setSelectText = index => {
+      content.value = Content[index]
+    }
+
+    onMounted(() => {
+      const dropArea = dropRef.value
+      dropArea.addEventListener(
+        'drop',
+        e => {
+          e.stopPropagation()
+          e.preventDefault()
+          console.log(`e.dataTransfer.files 》 `, e.dataTransfer.files)
+          readFile(e.dataTransfer.files[0])
+          setSelectText(0)
+        },
+        false
+      )
+      dropArea.addEventListener('dragleave', e => {
+        e.stopPropagation()
+        e.preventDefault()
+        setSelectText(0)
+      })
+      dropArea.addEventListener('dragenter', e => {
+        e.stopPropagation()
+        e.preventDefault()
+        setSelectText(1)
+      })
+      dropArea.addEventListener('dragover', e => {
+        e.stopPropagation()
+        e.preventDefault()
+        setSelectText(1)
+      })
+    })
 
     onBeforeMount(() => {
       const userAgent = window.navigator.userAgent.toLowerCase()
@@ -174,6 +220,9 @@ export default {
     })
 
     return {
+      content,
+      isTip,
+      dropRef,
       fileRef,
       canvasRef,
       sourceRef,
@@ -213,6 +262,13 @@ export default {
       margin-top: 20px;
       border: 1px solid #eee;
       flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      .tip {
+        color: red;
+      }
       input {
         height: 0;
         width: 0;
